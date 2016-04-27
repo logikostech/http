@@ -1,7 +1,7 @@
 {
   "name": "logikostech/http",
   "homepage": "https://github.com/logikostech/selectoptions",
-  "description": "Collection of classes extending Phalcon\Http\* for added functionality",
+  "description": "Collection of calsses extending\\Phalcon\\Http\\* classes for added functionality",
   "type": "library",
   "license": "MIT",
   "minimum-stability": "dev",
