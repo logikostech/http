@@ -1,0 +1,34 @@
+{
+  "name": "logikostech/http",
+  "homepage": "https://github.com/logikostech/selectoptions",
+  "description": "Collection of classes extending Phalcon\Http\* for added functionality",
+  "type": "library",
+  "license": "MIT",
+  "minimum-stability": "dev",
+  "keywords": [
+    "phalcon",
+    "plugin",
+    "logikostech",
+    "logikos",
+    "http",
+  ],
+  "authors": [{
+    "name": "Todd Empcke",
+    "email": "tempcke@logikostech.net"
+  }],
+  "repositories": [{
+    "type": "git",
+    "url": "https://github.com/logikostech/common"
+  }],
+  "require": {
+    "php": ">=5.4",
+    "ext-phalcon": "2.*",
+    "logikostech/common": "dev-master"
+  },
+  "autoload": {
+    "psr-4": {
+      "Logikos\\Http\\": "src/",
+      "Logikos\\Tests\\": "tests/"
+    }
+  }
+}
