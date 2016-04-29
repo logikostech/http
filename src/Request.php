@@ -24,7 +24,7 @@ class Request extends \Phalcon\Http\Request {
    * @param string $puthack
    */
   public function __construct($puthack=true) {
-    if ($this->_puthack = $puthack)
+    if ($this->puthack = $puthack)
       $this->_puthack();
     
     if ($this->getMethod() == 'PUT')
@@ -206,6 +206,7 @@ class Request extends \Phalcon\Http\Request {
     $this->_setPutData($data);
   }
   protected function _setPutData($data) {
+    $data = (array) $data;
     $this->_putCache = $data;
     $_REQUEST = array_merge($_REQUEST,$data);
   }
