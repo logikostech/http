@@ -31,6 +31,9 @@ class Request extends \Phalcon\Http\Request {
       $this->_parsePut();      
   }
   
+  public function isType($match) {
+    return in_array($this->_reqMethod(),self::_cls2array($match));
+  }
   public function contentType($checktype=null) {
     static $type;
     
@@ -222,6 +225,17 @@ class Request extends \Phalcon\Http\Request {
         ? $_SERVER['REQUEST_METHOD']
         : $_POST['_method']
     );
+  }
+  
+
+  protected static function _csl2array($list) {
+    if (is_string($list))
+      $list = array_map('trim',explode(',',$list));
+    
+    if (!is_array($list))
+      throw new InvalidArgumentException('list must be a comma seperated list string or an array',err::EMAIL);
+    
+    return $list;
   }
   
 }
