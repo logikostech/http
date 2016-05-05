@@ -24,13 +24,16 @@ class Request extends \Phalcon\Http\Request {
    * @param string $puthack
    */
   public function __construct($puthack=true) {
-    if ($this->_puthack = $puthack)
+    if ($this->puthack = $puthack)
       $this->_puthack();
     
     if ($this->getMethod() == 'PUT')
       $this->_parsePut();      
   }
   
+  public function isType($match) {
+    return in_array($this->_reqMethod(),self::_cls2array($match));
+  }
   public function contentType($checktype=null) {
     static $type;
     
@@ -206,6 +209,7 @@ class Request extends \Phalcon\Http\Request {
     $this->_setPutData($data);
   }
   protected function _setPutData($data) {
+    $data = (array) $data;
     $this->_putCache = $data;
     $_REQUEST = array_merge($_REQUEST,$data);
   }
@@ -221,6 +225,17 @@ class Request extends \Phalcon\Http\Request {
         ? $_SERVER['REQUEST_METHOD']
         : $_POST['_method']
     );
+  }
+  
+
+  protected static function _csl2array($list) {
+    if (is_string($list))
+      $list = array_map('trim',explode(',',$list));
+    
+    if (!is_array($list))
+      throw new InvalidArgumentException('list must be a comma seperated list string or an array',err::EMAIL);
+    
+    return $list;
   }
   
 }
