@@ -32,7 +32,7 @@ class Request extends \Phalcon\Http\Request {
   }
   
   public function isType($match) {
-    return in_array($this->_reqMethod(),self::_cls2array($match));
+    return $this->isMethod(explode(',',$match));
   }
   public function contentType($checktype=null) {
     static $type;
