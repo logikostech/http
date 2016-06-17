@@ -9,6 +9,13 @@ class Response extends PhResponse {
   
   protected $_responseData;
   
+
+  public function setJsonContent($content, $jsonOptions = 0, $depth = 512) {
+    parent::setJsonContent($content, $jsonOptions, $depth);
+    $this->setContentType('application/json', 'UTF-8');
+    $this->setHeader('E-Tag', md5($this->getContent()));
+  }
+    
   /**
    * Set location header without changing http_response_code (because php changes the stupid code on its own trying to help you out)
    * @param unknown $location
@@ -20,7 +27,15 @@ class Response extends PhResponse {
     http_response_code($c);
     return $this;
   }
-
+  
+  public function getData($key = null) {
+    if (is_null($key))
+      return $this->_responseData;
+    
+    return isset($this->_responseData[$key])
+        ? $this->_responseData[$key]
+        : null;
+  }
   public function setData($data=array()) {
     // array $data
     if (is_object($data) || is_array($data))
@@ -33,17 +48,68 @@ class Response extends PhResponse {
     return $this;
   }
   public function appendData($name, $value) {
-    $this->_data()->$name = $value;
+    $this->responseData()->$name = $value;
     return $this;
   }
+  protected function responseData() {
+    if (is_null($this->_responseData))
+      $this->_responseData = new Registry;
+    return $this->_responseData;
+  }
+  
 
   public function respond($status_code=null, $status_msg=null) {
     $this->setStatusCode($status_code, $status_msg);
-    $this->getDI()->get('view')->disable();
-    $this->_output();
+    if (!is_null($this->getData())) {
+      if ($this->getDI()->get('view'))
+        $this->getDI()->get('view')->disable();
+      
+      if ($this->canSendJson())
+        $this->sendDataAsJson($this->getData());
+      
+      else
+        $this->sendDataAsHtml($this->getData());
+    }
+    else
+      $this->send();
   }
   
+  /**
+   * format and send json_encode'able object or array
+   * @param mixed $data
+   */
+  public function sendDataAsHtml($data) {
+    if (extension_loaded('xdebug')) {
+      ob_start();
+      var_dump($data);
+      $output = ob_get_clean();
+    }
+    else {
+      $output = sprintf(
+          '<pre><code>%s</code></pre>',
+          json_encode($data,JSON_UNESCAPED_SLASHES|JSON_PRETTY_PRINT)
+      );
+    }
+    $this->setContent($output);
+    $this->send();
+  }
   
+  /**
+   * jsonify and send data
+   * @param mixed $data
+   */
+  public function sendDataAsJson($data) {
+    $this->setContentType('application/json', 'UTF-8');
+    if (is_object($data)) {
+      if (method_exists($data,'toArray'))
+        $data = $data->toArray();
+    }
+    if (empty($data))
+      $data = new \stdClass();
+    
+    $this->setJsonContent($data);
+    $this->send();
+  }
   protected function canSendJson() {
     /* @var $request \Logikos\Http\Request */
     $request = $this->getDI()->get('request');
@@ -59,11 +125,5 @@ class Response extends PhResponse {
       
       header($header,true);
     }
-  }
-  protected function _data() {
-    if (is_null($this->_responseData))
-      $this->_responseData = new Registry;
-    
-    return $this->_responseData;
   }
 }
