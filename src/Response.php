@@ -39,7 +39,7 @@ class Response extends PhResponse {
   public function setData($data=array()) {
     // array $data
     if (is_object($data) || is_array($data))
-      foreach($data as $k->$v)
+      foreach($data as $k=>$v)
         $this->appendData($k,$v);
     
     else
@@ -52,8 +52,9 @@ class Response extends PhResponse {
     return $this;
   }
   protected function responseData() {
-    if (is_null($this->_responseData))
+    if (is_null($this->_responseData)) {
       $this->_responseData = new Registry;
+    }
     return $this->_responseData;
   }
   
@@ -61,24 +62,27 @@ class Response extends PhResponse {
   public function respond($status_code=null, $status_msg=null) {
     $this->setStatusCode($status_code, $status_msg);
     if (!is_null($this->getData())) {
-      if ($this->getDI()->get('view'))
-        $this->getDI()->get('view')->disable();
-      
-      if ($this->canSendJson())
-        $this->sendDataAsJson($this->getData());
-      
-      else
-        $this->sendDataAsHtml($this->getData());
+      $this->sendData($this->getData());
     }
-    else
+    else {
       $this->send();
+    }
   }
-  
+  public function sendData($data, $status_code=null, $status_msg=null) {
+    $this->setStatusCode($status_code, $status_msg);
+    if ($this->canSendJson()) {
+      $this->sendDataAsJson($data);
+    }
+    else {
+      $this->sendDataAsHtml($data);
+    }
+  }
   /**
    * format and send json_encode'able object or array
    * @param mixed $data
    */
   public function sendDataAsHtml($data) {
+    $this->disableView();
     if (extension_loaded('xdebug')) {
       ob_start();
       var_dump($data);
@@ -99,6 +103,7 @@ class Response extends PhResponse {
    * @param mixed $data
    */
   public function sendDataAsJson($data) {
+    $this->disableView();
     $this->setContentType('application/json', 'UTF-8');
     if (is_object($data)) {
       if (method_exists($data,'toArray'))
@@ -124,6 +129,11 @@ class Response extends PhResponse {
         : "{$key}: {$value}";
       
       header($header,true);
+    }
+  }
+  protected function disableView() {
+    if ($this->getDI()->get('view')) {
+      $this->getDI()->get('view')->disable();
     }
   }
 }
