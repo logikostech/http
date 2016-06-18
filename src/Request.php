@@ -30,6 +30,32 @@ class Request extends \Phalcon\Http\Request {
     if ($this->getMethod() == 'PUT')
       $this->_parsePut();      
   }
+  public function getMime($type) {
+    $mime = $type;
+    if (!strstr($type,'/')) {
+      switch (strtolower($match)) {
+        case 'xml'   :
+        case 'json'  : $mime = 'application/'.$match; break;
+        
+        case 'jpeg'  :
+        case 'gif'   : $mime = 'image/'.$match; break;
+        
+        default      : $mime = 'text/'.$match;
+      }
+    }
+    return $mime;
+  }
+  public function willAccept($match) {
+    $mime = explode('/',$this->getMime($match));
+    foreach($this->getAcceptableContent() as $accept) {
+      $accept = explode('/',$accept);
+      $prefixmatch = $accept[0] == '*' || $accept[0] == $mime[0];
+      $typematch   = $accept[1] == '*' || $accept[1] == $mime[1];
+      if ($prefixmatch && $typematch)
+        return true;
+    }
+    return false;
+  }
   
   public function isType($match) {
     return $this->isMethod(explode(',',$match));
