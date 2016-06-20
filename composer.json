@@ -30,7 +30,7 @@
   },
   "autoload": {
     "psr-4": {
-      "Logikos\\Http\\": "src/",
+      "Logikos\\": "src/",
       "Logikos\\Tests\\": "tests/"
     }
   }

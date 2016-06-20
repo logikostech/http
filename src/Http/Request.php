@@ -23,32 +23,86 @@ class Request extends \Phalcon\Http\Request {
    *  - $this->_putCache = $_POST
    * @param string $puthack
    */
-  public function __construct($puthack=true) {
-    if ($this->puthack = $puthack)
-      $this->_puthack();
+  public function __construct($rawBody=null) {
+    // this is useful for tests...
+    if (!is_null($rawBody)) {
+      $this->_rawBody = $rawBody;
+    }
     
-    if ($this->getMethod() == 'PUT')
-      $this->_parsePut();      
+    if ($this->inputNeedsParsed()) {
+      
+    }
+    
+//     if ($this->inputNeedsParsed()) {
+//       $this->_parseInput();
+//     }
+//       $this->_parsePut();      
   }
-  public function getMime($type) {
-    $mime = $type;
-    if (!strstr($type,'/')) {
+  
+  public function inputNeedsParsed() {
+    // check for $_POST['_method'] to hack request method
+    $not_fake_post   = !$this->fakePostHack();
+    
+    // limit to only valid methods
+    $valid_method    =  $this->isValidHttpMethod($this->getMethod());
+    
+    // limit to requests with a defined content type
+    $content_type    =  $this->getContentTypeMime();
+    
+    // ignore GET requests as body should be ignored: http://stackoverflow.com/a/983458 | https://groups.yahoo.com/neo/groups/rest-discuss/conversations/messages/9962
+    $not_get_request = !$this->isGet();
+    
+    // php already handles 'normal' post requests just fine...
+    $not_normal_post = !$this->isPost() || !$this->isContentType(['form-data','x-www-form-urlencoded']);
+    
+    return $not_fake_post
+        && $valid_method
+        && $content_type
+        && $not_get_request
+        && $not_normal_post;
+  }
+  
+  // some people like to do PUT and PATCH requests via POST beings html form method attribute only accepts GET|POST
+  public function fakePostHack() {
+    if ($this->isPost()) {
+      $altmethod = $this->getPost('_method');
+      if ($altmethod && $altmethod != 'POST') {
+        if ($this->isValidHttpMethod($altmethod)) {
+          $this->rawdata = $this->getPost();
+          $_SERVER['REQUEST_METHOD'] = $altmethod;
+          return true;
+        }
+      }
+    }
+  }
+  
+  public function getMime($match) {
+    $mime = $match;
+    if (!strstr($match,'/')) {
       switch (strtolower($match)) {
-        case 'xml'   :
-        case 'json'  : $mime = 'application/'.$match; break;
+        case 'x-www-form-urlencoded' :
+        case 'xhtml+xml' :
+        case 'xml'       :
+        case 'json'      :
+          $mime = 'application/'.$match; break;
         
-        case 'jpeg'  :
-        case 'gif'   : $mime = 'image/'.$match; break;
+        case 'jpeg'      :
+        case 'gif'       :
+          $mime = 'image/'.$match; break;
         
-        default      : $mime = 'text/'.$match;
+        case 'form-data' :
+          $mime = 'multipart/form-data'; break;
+        
+        default          :
+          $mime = 'text/'.$match;
       }
     }
     return $mime;
   }
   public function willAccept($match) {
     $mime = explode('/',$this->getMime($match));
-    foreach($this->getAcceptableContent() as $accept) {
-      $accept = explode('/',$accept);
+    foreach($this->getAcceptableContent() as $v) {
+      $accept = explode('/',$v['accept']);
       $prefixmatch = $accept[0] == '*' || $accept[0] == $mime[0];
       $typematch   = $accept[1] == '*' || $accept[1] == $mime[1];
       if ($prefixmatch && $typematch)
@@ -57,22 +111,41 @@ class Request extends \Phalcon\Http\Request {
     return false;
   }
   
+  /**
+   * This is an alias to isMethod but supports a comma seperated list in addition to an array
+   * ex: $request->isType('POST,PUT') 
+   * @param unknown $match
+   * @return boolean
+   */
   public function isType($match) {
-    return $this->isMethod(explode(',',$match));
-  }
-  public function contentType($checktype=null) {
-    static $type;
-    
-    if (!$type)
-      $type = $this->getContentType()
-          ? explode(';',strtolower($this->getContentType()))[0]
-          : null;
-    
-    return $checktype
-      ? strtolower(trim($checktype)) === $type
-      : $type;
+    $match = is_array($match) ? $match : explode(',',$match);
+    return $this->isMethod($match);
   }
   
+  /**
+   * Similar to Phalcon\Http\Request::getContentType() except it removes the charactor encodeing
+   * ex: 'application/x-www-form-urlencoded; charset=UTF-8' results in 'application/x-www-form-urlencoded'
+   * @return String|Null
+   */
+  public function getContentTypeMime() {
+    return $this->getContentType()
+        ? explode(';',strtolower($this->getContentType()))[0]
+        : null;
+  }
+  /**
+   * Checks if the content type matches $mime
+   * @param string $mime examples: 'html', 'text/html', 'json' etc. 
+   * @return boolean
+   */
+  public function isContentType($mime) {
+    foreach ((array) $mime as $m) {
+      $m = $this->getMime($m);
+      if (strtolower($m) === $this->getContentTypeMime()) {
+        return true;
+      }
+    }
+    return false;
+  }
 
   /**
    * getFiles([name]) - converts $_FILES to a more usable format
@@ -109,19 +182,26 @@ class Request extends \Phalcon\Http\Request {
   public function getFiles($name=null) {
     static $cache;
     if (!$cache) {
-      $cache = array();
+      $cache = new \Phalcon\Config;
       foreach($_FILES as $inputName => $file) {
+        if (!isset($cache->$inputName)) {
+          $cache->$inputName = [];
+        }
+          
         if (!is_array($file['name'])) {
-          $cache[$inputName] = $this->_getFileObject($file);
+          $cache->$inputName = $this->_getFileObject($file);
           continue;
         }
+        
         $f = array();
-        foreach ($file as $attr=>$list)
-          foreach($list as $k=>$v)
+        foreach ($file as $attr=>$list) {
+          foreach($list as $k=>$v) {
             $f[$k][$attr] = $v;
-
-        foreach ($f as $v)
-          $cache[$inputName][] = $this->_getFileObject($v);
+          }
+        }
+        foreach ($f as $v) {
+          array_push($cache->$inputName,$this->_getFileObject($v));
+        }
       }
     }
     if (is_null($name))
@@ -136,9 +216,6 @@ class Request extends \Phalcon\Http\Request {
     return new LogikosFile($file);
   }
   
-  protected function _puthack() {
-    $_SERVER['REQUEST_METHOD'] = $this->_reqMethod();
-  }
   
   protected function _parsePut() {
     $data = array();
@@ -148,7 +225,7 @@ class Request extends \Phalcon\Http\Request {
       $data = $_POST;
     }
 
-	  elseif ($this->contentType('multipart/form-data')) {
+	  elseif ($this->getContentTypeMime('multipart/form-data')) {
   
       // Fetch content and determine boundary
       $boundary = substr($this->getRawBody(), 0, strpos($this->getRawBody(), "\r\n"));
@@ -223,10 +300,10 @@ class Request extends \Phalcon\Http\Request {
         }
       }
     }
-    elseif ($this->contentType('application/x-www-form-urlencoded')) {
+    elseif ($this->getContentTypeMime('application/x-www-form-urlencoded')) {
       parse_str($this->getRawBody(),$data);
     }
-    elseif ($this->contentType('application/json')) {
+    elseif ($this->getContentTypeMime('application/json')) {
       $data = json_decode($this->getRawBody());
     }
     elseif (!$data = $this->_jsonDecode(trim($this->getRawBody()))) {

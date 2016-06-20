@@ -20,9 +20,21 @@ use Logikos\ArrayAccessTrait;
  */
 class File extends PhalconFile implements ArrayAccessInterface {
   use ArrayAccessTrait;
-
-  public function __construct($file, $key = null) {
+  
+  public function __construct(array $file, $key = null) {
     parent::__construct($file,$key);
     $this->offsetImport($file);
+  }
+  
+  public function toArray() {
+    return isset($this->_arrayAccessContainer)
+        ? $this->_arrayAccessContainer
+        : [
+            'name'     => $this->getName(),
+            'type'     => $this->getType(),
+            'tmp_name' => $this->getTempName(),
+            'error'    => $this->getError(),
+            'size'     => $this->getSize()
+        ];
   }
 }
