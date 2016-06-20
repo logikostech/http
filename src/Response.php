@@ -60,7 +60,7 @@ class Response extends PhResponse {
   
 
   public function respond($status_code=null, $status_msg=null) {
-    $this->setStatusCode($status_code, $status_msg);
+    $this->_setStatus($status_code, $status_msg);
     if (!is_null($this->getData())) {
       $this->sendData($this->getData());
     }
@@ -69,12 +69,17 @@ class Response extends PhResponse {
     }
   }
   public function sendData($data, $status_code=null, $status_msg=null) {
-    $this->setStatusCode($status_code, $status_msg);
+    $this->_setStatus($status_code, $status_msg);
     if ($this->canSendJson()) {
       $this->sendDataAsJson($data);
     }
     else {
       $this->sendDataAsHtml($data);
+    }
+  }
+  protected function _setStatus($code=null, $msg=null) {
+    if ($code) {
+      $this->setStatusCode($code, $msg);
     }
   }
   /**
