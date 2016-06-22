@@ -23,6 +23,7 @@ class Formdata implements AdapterInterface {
         $this->processFormdataPart($part);
       }
     }
+    $this->compileData();
     return $this->fd;
   }
 
@@ -46,7 +47,11 @@ class Formdata implements AdapterInterface {
     }
   }
   protected function formdataSetPostValue($sect) {
-    $this->fd->post[$sect->disposition->name] = substr($sect->body, 0, strlen($sect->body) - 2);
+    $key   = $sect->disposition->name;
+    $value = substr($sect->body, 0, strlen($sect->body) - 2);
+    
+    // we do it this way to support name=foo[bar][] etc...
+    $this->postquerystr[] = "{$key}={$value}"; 
   }
   protected function formdataParts($content) {
     $boundary = substr($content, 0, strpos($content, "\r\n"));
@@ -92,17 +97,37 @@ class Formdata implements AdapterInterface {
       return (object) $disposition;
     }
   }
+  
+  // builds structure the same way php builds $_FILES
+  // has support for multiple files where name ends in [] such as name=foo[]
+  // known issue: fails on deeper arrays such as if name=foo[bar][]
   protected function appendFile($sect) {
-    // if labeled the same as previous, skip
-    if(!isset($this->fd->files[$sect->disposition->name])) {
-      $this->fd->files[$sect->disposition->name] = [
-          'error'    => 0,
-          'name'     => $sect->disposition->filename,
-          'tmp_name' => $this->makeTempFile($sect->body),
-          'size'     => strlen($sect->body),
-          'type'     => trim($sect->type)
-      ];
+    $data = $this->filedata($sect);
+    
+    $multi = substr($sect->disposition->name,-2)=='[]';
+    if ($multi) {
+      $key = substr($sect->disposition->name,0,-2);
+      foreach($data as $k=>$v) {
+        $value = isset($this->fd->files[$key][$k])
+          ? (array) $this->fd->files[$key][$k]
+          : [];
+        array_push($value,$v);
+        $this->fd->files[$key][$k] = $value;
+      }
     }
+    else {
+      $key = $sect->disposition->name;
+      $this->fd->files[$key] = $data;
+    }
+  }
+  protected function filedata($sect) {
+    return array(
+        'error'    => 0,
+        'name'     => $sect->disposition->filename,
+        'tmp_name' => $this->makeTempFile($sect->body),
+        'size'     => strlen(trim($sect->body)),
+        'type'     => trim($sect->type)
+    );
   }
   protected function makeTempFile($content,$prefix=null) {
     if (is_null($prefix))
@@ -111,5 +136,8 @@ class Formdata implements AdapterInterface {
     $tmp_name = tempnam(ini_get('upload_tmp_dir'), $prefix);
     file_put_contents($tmp_name, $content);
     return $tmp_name;
+  }
+  protected function compileData() {
+    parse_str(implode('&',$this->postquerystr),$this->fd->post);
   }
 } 
