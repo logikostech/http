@@ -59,10 +59,26 @@ class ContentParserTest extends \PHPUnit_Framework_TestCase {
     $result->files['singlefile']['tmp_name']    = $expected->files['singlefile']['tmp_name'];
     $result->files['manyfiles']['tmp_name']     = $expected->files['manyfiles']['tmp_name'];
     $result->files['singleinmulti']['tmp_name'] = $expected->files['singleinmulti']['tmp_name'];
-// print_r($expected->post);
-// print_r($result->post);
-// exit;
+
     $this->assertEquals($expected, $result);
+  }
+  
+  public function testCanOverwriteGlobalsOption() {
+    $_POST   = [];
+    $content = $this->getExampleJson();
+    
+    // no overwrite
+    $parser  = new ContentParser();
+    $result  = $parser->parseJson($content);
+    $this->assertEquals([], $_POST, 'post global should be empty because by default we do not overwrite globals');
+    
+    // overwrite
+    $parser  = new ContentParser([
+      'overwrite_post_global'  => true,
+      'overwrite_files_global' => true
+    ]);
+    $parser->parseJson($content);
+    $this->assertNotEquals([], $_POST, 'post global should have been overwriten..');
   }
   
   # data providers

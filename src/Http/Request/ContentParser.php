@@ -9,13 +9,41 @@ use Logikos\Http\Request\ContentParser\Adapter\Formdata;
  * 
  */
 class ContentParser {
+  use \Logikos\UserOptionTrait;
+  
+  private $_defaultOptions = [
+      'overwrite_post_global'  => false,
+      'overwrite_files_global' => false
+  ];
+  
+  public function __construct(array $userOptions = []) {
+    $this->_setDefaultUserOptions($this->_defaultOptions);
+    $this->mergeUserOptions($userOptions);
+  }
+  
+  protected function overwriteGlobals($data) {
+    if ($this->getUserOption('overwrite_post_global')) {
+      if (is_array($data))
+        $_POST = $data;
+      elseif (!empty($data->post))
+        $_POST = $data->post;
+    }
+    if ($this->getUserOption('overwrite_files_global')) {
+      if (!empty($data->files))
+        $_FILES = $data->files;
+    }
+  }
+  
   public function parseJson($content) {
-    return (array) $this->jsonDecode($content);
+    $data = (array) $this->jsonDecode($content);
+    $this->overwriteGlobals($data);
+    return $data;
   }
   public function parseUrlencoded($content) {
     if ($this->shouldReturnEmpty($content)) return [];
-    parse_str($content,$result);
-    return $result;
+    parse_str($content,$data);
+    $this->overwriteGlobals($data);
+    return $data;
   }
   
   // http://stackoverflow.com/a/18678678
@@ -24,7 +52,9 @@ class ContentParser {
   }
   
   protected function _parse($adapter,$content) {
-    return $adapter->parse($content);
+    $data = $adapter->parse($content);
+    $this->overwriteGlobals($data);
+    return $data;
   }
   
   /**
