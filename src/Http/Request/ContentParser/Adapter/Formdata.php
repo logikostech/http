@@ -4,6 +4,7 @@ namespace Logikos\Http\Request\ContentParser\Adapter;
 use Logikos\Http\Request\ContentParser\AdapterInterface;
 
 /**
+ * Though it no longer bares any resemblance this was
  * refactored from http://stackoverflow.com/a/18678678
  * @author tempcke
  */
@@ -12,8 +13,6 @@ class Formdata implements AdapterInterface {
   
   /**
    * Parse multipart/form-data
-   * @todo need to add support for <input type='file' name='pics[]' multiple />
-   * @todo add option to override $_POST and $_FILES
    * @return stdClass {post:[], files:[]}
    */
   public function parse($content) {
@@ -33,7 +32,25 @@ class Formdata implements AdapterInterface {
         'files' => []
     ];
   }
-  protected function processFOrmdataPart($part) {
+
+  protected function formdataParts($content) {
+    $boundary = $this->findBoundry($content);
+    return array_slice(explode($boundary, $content), 1);
+  }
+  
+  protected function findBoundry($content) {
+    $boundary = substr($content, 0, strpos($content, "\r\n"));
+    if(empty($boundary)) {
+      throw new \UnexpectedValueException('Invalid form-data, no boundry found');
+    }
+    return $boundary;
+  }
+  
+  protected function isLastPart($part) {
+    return $part == "--\r\n";
+  }
+  
+  protected function processFormdataPart($part) {
     $sect = $this->formdataSections($part);
     
     if ($this->hasDisposition($sect)) {
@@ -46,23 +63,7 @@ class Formdata implements AdapterInterface {
         $this->formdataSetPostValue($sect);
     }
   }
-  protected function formdataSetPostValue($sect) {
-    $key   = $sect->disposition->name;
-    $value = substr($sect->body, 0, strlen($sect->body) - 2);
-    
-    // we do it this way to support name=foo[bar][] etc...
-    $this->postquerystr[] = "{$key}={$value}"; 
-  }
-  protected function formdataParts($content) {
-    $boundary = substr($content, 0, strpos($content, "\r\n"));
-    if(empty($boundary)) {
-      throw new \UnexpectedValueException('Invalid form-data, no boundry found');
-    }
-    return array_slice(explode($boundary, $content), 1);
-  }
-  protected function isLastPart($part) {
-    return $part == "--\r\n";
-  }
+  
   protected function formdataSections($part) {
     list($head, $body) = explode("\r\n\r\n", ltrim($part, "\r\n"), 2);
     $headers = $this->formdataHeaders($head);
@@ -73,9 +74,7 @@ class Formdata implements AdapterInterface {
         'body' => $body
     ];
   }
-  protected function hasDisposition($sect) {
-    return !empty($sect->disposition);
-  }
+  
   protected function formdataHeaders($raw_headers) {
     $raw_headers = explode("\r\n", $raw_headers);
     $headers = array();
@@ -87,6 +86,7 @@ class Formdata implements AdapterInterface {
     }
     return $headers;
   }
+
   protected function disposition($headers) {
     if (isset($headers['content-disposition'])) {
       preg_match(
@@ -96,6 +96,10 @@ class Formdata implements AdapterInterface {
       );
       return (object) $disposition;
     }
+  }
+
+  protected function hasDisposition($sect) {
+    return !empty($sect->disposition);
   }
   
   // builds structure the same way php builds $_FILES
@@ -120,6 +124,7 @@ class Formdata implements AdapterInterface {
       $this->fd->files[$key] = $data;
     }
   }
+
   protected function filedata($sect) {
     return array(
         'error'    => 0,
@@ -129,6 +134,7 @@ class Formdata implements AdapterInterface {
         'type'     => trim($sect->type)
     );
   }
+
   protected function makeTempFile($content,$prefix=null) {
     if (is_null($prefix))
       $prefix='contentparse';
@@ -137,6 +143,15 @@ class Formdata implements AdapterInterface {
     file_put_contents($tmp_name, $content);
     return $tmp_name;
   }
+  
+  protected function formdataSetPostValue($sect) {
+    $key   = $sect->disposition->name;
+    $value = substr($sect->body, 0, strlen($sect->body) - 2);
+    
+    // we do it this way to support name=foo[bar][] etc...
+    $this->postquerystr[] = "{$key}={$value}"; 
+  }
+
   protected function compileData() {
     parse_str(implode('&',$this->postquerystr),$this->fd->post);
   }
