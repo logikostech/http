@@ -56,7 +56,12 @@ class ContentParserTest extends \PHPUnit_Framework_TestCase {
     $this->assertEquals('contentparse', substr(basename($tmpname),0,12));
     
     // tmp_name ends with a random string so we need to ignore it
-    $result->files['singlefile']['tmp_name'] = $expected->files['singlefile']['tmp_name'];
+    $result->files['singlefile']['tmp_name']    = $expected->files['singlefile']['tmp_name'];
+    $result->files['manyfiles']['tmp_name']     = $expected->files['manyfiles']['tmp_name'];
+    $result->files['singleinmulti']['tmp_name'] = $expected->files['singleinmulti']['tmp_name'];
+// print_r($expected->post);
+// print_r($result->post);
+// exit;
     $this->assertEquals($expected, $result);
   }
   
