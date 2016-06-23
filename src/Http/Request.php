@@ -6,6 +6,7 @@ use Phalcon\Registry;
 use Phalcon\Http\Request\File;
 use Phalcon\Http\Request\FileInterface;
 use Logikos\Http\Request\File as LogikosFile;
+use Logikos\Http\Request\ContentParser;
 
 /**
  * The main purpose of this class is for better handeling of PUT requests
@@ -30,13 +31,8 @@ class Request extends \Phalcon\Http\Request {
     }
     
     if ($this->inputNeedsParsed()) {
-      
-    }
-    
-//     if ($this->inputNeedsParsed()) {
-//       $this->_parseInput();
-//     }
-//       $this->_parsePut();      
+      $this->parseContent();
+    }    
   }
   
   public function inputNeedsParsed() {
@@ -62,13 +58,54 @@ class Request extends \Phalcon\Http\Request {
         && $not_normal_post;
   }
   
+  public function parseContent($content=null, $type=null) {
+    if (is_null($content)) {
+      $content = $this->getRawBody();
+    }
+    
+    $type = is_null($type)
+      ? $this->getContentTypeMime()
+      : $this->getMime($type);
+
+    $contentParser = new ContentParser();
+    switch ($type) {
+      case 'application/json' :
+        $data = $contentParser->parseJson($content);
+        break;
+      case 'application/x-www-form-urlencoded' :
+        $data = $contentParser->parseUrlencoded($content);
+        break;
+      case 'multipart/form-data' :
+        $result = $contentParser->parseFormdata($content);
+        $data   = $result->post;
+        $_FILES = $result->files;
+        break;
+      default :
+        $data = [];
+    }
+    $this->setRawData($data);
+  }
+  
+  public function getPatch($name=null, $filters=null, $defaultValue=null, $notAllowEmpty=false, $noRecursive=false) {
+    if (!is_null($this->_patchCache)) {
+      return $this->getHelper(
+          $this->_patchCache,
+          $name,
+          $filters,
+          $defaultValue,
+          $notAllowEmpty,
+          $noRecursive
+      );
+    }
+  }
+  
   // some people like to do PUT and PATCH requests via POST beings html form method attribute only accepts GET|POST
   public function fakePostHack() {
     if ($this->isPost()) {
       $altmethod = $this->getPost('_method');
       if ($altmethod && $altmethod != 'POST') {
         if ($this->isValidHttpMethod($altmethod)) {
-          $this->rawdata = $this->getPost();
+          $this->setRawData($this->getPost());
           $_SERVER['REQUEST_METHOD'] = $altmethod;
           return true;
         }
@@ -215,106 +252,12 @@ class Request extends \Phalcon\Http\Request {
   protected function _getFileObject($file) {
     return new LogikosFile($file);
   }
-  
-  
-  protected function _parsePut() {
-    $data = array();
-
-    // this supports PUT requests that are tunneled through POST via <input type="hidden" name="_method" value="put" /> 
-    if (!empty($_POST['_method']) && $_POST['_method']=='PUT') {
-      $data = $_POST;
-    }
-
-	  elseif ($this->getContentTypeMime('multipart/form-data')) {
-  
-      // Fetch content and determine boundary
-      $boundary = substr($this->getRawBody(), 0, strpos($this->getRawBody(), "\r\n"));
-  
-      if(empty($boundary)){
-          parse_str($this->getRawBody(),$data);
-          $this->_setPutData($data);
-          return;
-      }
-  
-      // Fetch each part
-      $parts = array_slice(explode($boundary, $this->getRawBody()), 1);
-      $data = array();
-  
-      foreach ($parts as $part) {
-        // If this is the last part, break
-        if ($part == "--\r\n") break;
-  
-        // Separate content from headers
-        $part = ltrim($part, "\r\n");
-        list($raw_headers, $body) = explode("\r\n\r\n", $part, 2);
-  
-        // Parse the headers list
-        $raw_headers = explode("\r\n", $raw_headers);
-        $headers = array();
-        foreach ($raw_headers as $header) {
-            list($name, $value) = explode(':', $header);
-            $headers[strtolower($name)] = ltrim($value, ' ');
-        }
-  
-        // Parse the Content-Disposition to get the field name, etc.
-        if (isset($headers['content-disposition'])) {
-          $filename = null;
-          $tmp_name = null;
-          preg_match(
-              '/^(.+); *name="([^"]+)"(; *filename="([^"]+)")?/',
-              $headers['content-disposition'],
-              $matches
-          );
-          list(, $type, $name) = $matches;
-  
-          //Parse File
-          if( isset($matches[4]) )        {
-            //if labeled the same as previous, skip
-            if( isset( $_FILES[ $matches[ 2 ] ] ) )          {
-                continue;
-            }
-  
-            //get filename
-            $filename = $matches[4];
-  
-            //get tmp name
-            $filename_parts = pathinfo( $filename );
-            $tmp_name = tempnam( ini_get('upload_tmp_dir'), $filename_parts['filename']);
-  
-            //populate $_FILES with information, size may be off in multibyte situation
-            $_FILES[ $matches[ 2 ] ] = array(
-                'error'=>0,
-                'name'=>$filename,
-                'tmp_name'=>$tmp_name,
-                'size'=>strlen( $body ),
-                'type'=>$value
-            );
-  
-            //place in temporary directory
-            file_put_contents($tmp_name, $body);
-          }
-          //Parse Field
-          else        {
-            $data[$name] = substr($body, 0, strlen($body) - 2);
-          }
-        }
-      }
-    }
-    elseif ($this->getContentTypeMime('application/x-www-form-urlencoded')) {
-      parse_str($this->getRawBody(),$data);
-    }
-    elseif ($this->getContentTypeMime('application/json')) {
-      $data = json_decode($this->getRawBody());
-    }
-    elseif (!$data = $this->_jsonDecode(trim($this->getRawBody()))) {
-      parse_str($this->getRawBody(),$data);
-    }
-    $this->_setPutData($data);
-  }
-  protected function _setPutData($data) {
-    $data = (array) $data;
-    $this->_putCache = $data;
-    $_REQUEST = array_merge($_REQUEST,$data);
+  protected function setRawData($data) {
+    $this->rawdata = (array) $data;
+    $method = strtolower($this->getMethod());
+    $var = "_{$method}Cache";
+    $this->$var = $this->rawdata;
+    $_REQUEST = array_merge($_REQUEST,$this->rawdata);
   }
 
 

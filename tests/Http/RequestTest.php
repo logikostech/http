@@ -8,6 +8,7 @@ class RequestTest extends \PHPUnit_Framework_TestCase {
   public static $basedir;
   protected $di;
   protected $request;
+  protected $srvsetcache = [];
 
   public static function setUpBeforeClass() {
     static::$basedir = realpath(substr(__DIR__.'/',0,strrpos(__DIR__.'/','/tests/')+7));
@@ -15,6 +16,7 @@ class RequestTest extends \PHPUnit_Framework_TestCase {
   }
   
   public function setup() {
+    $this->_cleanupSetServerVars();
     $this->di = new \Phalcon\Di;
     $this->di->set('request','\\Logikos\\Http\\Request');
     $this->setReqMethod('GET');
@@ -22,14 +24,14 @@ class RequestTest extends \PHPUnit_Framework_TestCase {
     $this->request->setDI($this->di);
   }
   
-  protected function setReqMethod($method) {
-    $_SERVER['REQUEST_METHOD'] = $method;
+  public function testInstanceOf() {
+    $expected = 'Logikos\Http\Request';
+    $this->assertInstanceOf(
+        $expected,
+        $this->request,
+        'The new object is not of the correct class.'
+    );
   }
-  protected function setHackMethod($method) {
-    $_SERVER['REQUEST_METHOD'] = 'POST';
-    $_POST['_method'] = $method;
-  }
-  
   public function testCanBuildCorrectMimeType() {
     $m = [
         'xml'    => 'application/xml',
@@ -47,7 +49,7 @@ class RequestTest extends \PHPUnit_Framework_TestCase {
   
   public function testContentTypeIsAcceptable() {
     $acceptable = 'application/json,text/html;q=0.9,text/*;q=0.8';
-    $_SERVER['HTTP_ACCEPT'] = $acceptable;
+    $this->_setServerVar('HTTP_ACCEPT', $acceptable);
     $will = [
         'html',
         'text/html',
@@ -79,45 +81,24 @@ class RequestTest extends \PHPUnit_Framework_TestCase {
   }
   
   public function testCanGetContentTypeMime() {
-    $_SERVER["CONTENT_TYPE"] = 'application/json; charset=utf-8';
+    $this->_setServerVar("CONTENT_TYPE",'application/json; charset=utf-8');
     $this->assertEquals('application/json', $this->request->getContentTypeMime());
     $this->assertTrue($this->request->isContentType('json'));
   }
   
   public function testContentTypeInArray() {
-    $_SERVER["CONTENT_TYPE"] = 'application/json; charset=utf-8';
+    $this->_setServerVar("CONTENT_TYPE",'application/json; charset=utf-8');
     $goodmatch = ['html','json'];
     $badmatch = ['html','xml'];
     $this->assertTrue($this->request->isContentType($goodmatch));
     $this->assertFalse($this->request->isContentType($badmatch));
     $this->assertTrue($this->request->isContentType('json'));
-    unset($_SERVER['CONTENT_TYPE']);
+    $this->_unsetServerVar('CONTENT_TYPE');
     $this->assertFalse($this->request->isContentType('json'));
   }
   
   
   
-  # Uploaded Files
-
-  protected function getFiles() {
-    $_FILES = [                                     
-      'onefile'   => [
-        'name'      => 'a.txt',
-        'type'      => 'text/plain',
-        'tmp_name'  => '/tmp/phpqgn1Aj',
-        'error'     => 0,
-        'size'      => 2,
-      ],
-      'multifile' => [
-        'name'      => ['b.txt',          'c.txt'         ],
-        'type'      => ['text/plain',     'text/plain'    ],
-        'tmp_name'  => ['/tmp/phpZ1Vy0R', '/tmp/phpJCU6pq'],
-        'error'     => [0,                0               ],
-        'size'      => [2,                2               ]
-      ],
-    ];
-    return $this->request->getFiles();
-  }
   public function testCanAccessInputFilesAsArrayProperties() {
     $files = $this->getFiles();
     $this->assertInstanceOf(
@@ -184,10 +165,107 @@ class RequestTest extends \PHPUnit_Framework_TestCase {
         $files->multifile[1]->toArray()
     );
   }
+  
+  // the tests for ContentParser cover many other situations that do not need repeted here
+  // this test is really confirming that the requests class is automaticly useing contentparser
   public function testJsonParse() {
     $this->setReqMethod('PUT');
-    $a = [
-        'foo' => 'bar'
+    $this->_setServerVar("CONTENT_TYPE",'application/json; charset=utf-8');
+    $rawbody       = $this->getExampleJson();
+    $this->request = new Request($rawbody);
+    $expected      = (array) json_decode($rawbody);
+    $actual        = $this->request->getPut();
+    $this->assertEquals($expected, $actual);
+  }
+  public function testCanParseFormdata() {
+    $this->setReqMethod('PUT');
+    $this->_setServerVar("CONTENT_TYPE",'multipart/form-data; charset=utf-8');
+    $rawbody       = $this->getExampleFormdata();
+    $this->request = new Request($rawbody);
+    $expected      = $this->getExampleFormdataResult()->post;
+    $actual        = $this->request->getPut();
+    $this->assertEquals($expected, $actual);
+  }
+
+  
+  protected function setReqMethod($method) {
+    $this->_setServerVar('REQUEST_METHOD',$method);
+  }
+  protected function setHackMethod($method) {
+    $this->setReqMethod('POST');
+    $_POST['_method'] = $method;
+  }
+
+  # Uploaded Files
+
+  protected function getFiles() {
+    $_FILES = [                                     
+      'onefile'   => [
+        'name'      => 'a.txt',
+        'type'      => 'text/plain',
+        'tmp_name'  => '/tmp/phpqgn1Aj',
+        'error'     => 0,
+        'size'      => 2,
+      ],
+      'multifile' => [
+        'name'      => ['b.txt',          'c.txt'         ],
+        'type'      => ['text/plain',     'text/plain'    ],
+        'tmp_name'  => ['/tmp/phpZ1Vy0R', '/tmp/phpJCU6pq'],
+        'error'     => [0,                0               ],
+        'size'      => [2,                2               ]
+      ],
     ];
+    return $this->request->getFiles();
+  }
+  
+
+  # example content
+  protected function getExampleFormdata() {
+    return file_get_contents(self::$basedir.'/var/content/formdata');
+  }
+  protected function getExampleFormdataResult() {
+    return include self::$basedir.'/var/content/formdata.php';
+  }
+  protected function getExampleUrlencoded() {
+    return http_build_query($this->getExampleArray());
+  }
+  protected function getExampleJson() {
+    return json_encode($this->getExampleArray());
+  }
+  protected function getExampleArray() {
+    return [
+        'firstName' => 'John',
+        'lastName'  => 'Smith',
+        'age'       => 25,
+        'street'    => '134 2nd Street',
+        'city'      => 'New York',
+        'state'     => 'NY',
+        'zipcode'   => '10021',
+        'phoneNum'  => [ 
+            [
+               'type' => 'work',
+               'number' => '212 555-1234',
+            ],
+            [
+               'type' => 'cell',
+               'number' => '646 555-4567',
+            ],
+        ],
+    ];
+  }
+  
+  protected function _setServerVar($var, $value) {
+    $this->srvsetcache[$var] = $var;
+    $_SERVER[$var] = $value;
+  }
+  protected function _unsetServerVar($var) {
+    unset($_SERVER[$var]);
+    unset($this->srvsetcache[$var]);
+  }
+  protected function _cleanupSetServerVars() {
+    foreach($this->srvsetcache as $var) {
+      $this->_unsetServerVar($var);
+    }
+    $this->setReqMethod('GET'); // default method
   }
 }
