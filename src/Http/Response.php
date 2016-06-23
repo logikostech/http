@@ -123,7 +123,7 @@ class Response extends PhResponse {
   protected function canSendJson() {
     /* @var $request \Logikos\Http\Request */
     $request = $this->getDI()->get('request');
-    $accept = $request->willAccept('json');
+    return $request->willAccept('json');
   }
   
   protected function _setHeader($key,$value=null) {
