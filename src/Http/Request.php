@@ -136,13 +136,14 @@ class Request extends \Phalcon\Http\Request {
     }
     return $mime;
   }
-  public function willAccept($match) {
+  public function willAccept($match,$qualitylimit=0.9) {
     $mime = explode('/',$this->getMime($match));
     foreach($this->getAcceptableContent() as $v) {
       $accept = explode('/',$v['accept']);
-      $prefixmatch = $accept[0] == '*' || $accept[0] == $mime[0];
-      $typematch   = $accept[1] == '*' || $accept[1] == $mime[1];
-      if ($prefixmatch && $typematch)
+      $prefixmatch  = $accept[0] == '*' || $accept[0] == $mime[0];
+      $typematch    = $accept[1] == '*' || $accept[1] == $mime[1];
+      $qualitymatch = $v['quality'] >= $qualitylimit;
+      if ($prefixmatch && $typematch && $qualitymatch)
         return true;
     }
     return false;

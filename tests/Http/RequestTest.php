@@ -48,7 +48,7 @@ class RequestTest extends \PHPUnit_Framework_TestCase {
   }
   
   public function testContentTypeIsAcceptable() {
-    $acceptable = 'application/json,text/html;q=0.9,text/*;q=0.8';
+    $acceptable = 'application/json,text/html,text/*;q=0.9,*/*;q=0.8';
     $this->_setServerVar('HTTP_ACCEPT', $acceptable);
     $will = [
         'html',
@@ -60,11 +60,18 @@ class RequestTest extends \PHPUnit_Framework_TestCase {
         'gif',
         'image/jpeg'
     ];
-    foreach ($will as $mime) {
-      $this->assertTrue($this->request->willAccept($mime),"{$mime} should be acceptable: {$acceptable}?");
+    $this->assertWillAccept($will, 0.9);
+    $this->assertWillAccept($wont, 0.8);
+    $this->assertWillNotAccept($wont, 0.9);
+  }
+  public function assertWillAccept(array $mimes,$qualitylimit) {
+    foreach ($mimes as $mime) {
+      $this->assertTrue($this->request->willAccept($mime,$qualitylimit),"{$mime} SHOULD be acceptable with quality limit of {$qualitylimit}: {$_SERVER['HTTP_ACCEPT']}?");
     }
-    foreach($wont as $mime) {
-      $this->assertFalse($this->request->willAccept($mime),"{$mime} should not be acceptable: {$acceptable}?");
+  }
+  public function assertWillNotAccept(array $mimes,$qualitylimit) {
+    foreach ($mimes as $mime) {
+      $this->assertFalse($this->request->willAccept($mime,$qualitylimit),"{$mime} SHOULD NOT be acceptable with quality limit of {$qualitylimit}: {$_SERVER['HTTP_ACCEPT']}?");
     }
   }
   public function testCheckHttpMethodAginstCLS() {
