@@ -1,37 +1,37 @@
 {
-  "name": "logikostech/http",
-  "homepage": "https://github.com/logikostech/http",
-  "description": "Collection of calsses extending\\Phalcon\\Http\\* classes for added functionality",
-  "type": "library",
-  "license": "MIT",
-  "minimum-stability": "dev",
-  "keywords": [
-    "phalcon",
-    "plugin",
-    "logikostech",
-    "logikos",
-    "http"
-  ],
-  "authors": [{
-    "name": "Todd Empcke",
-    "email": "tempcke@logikostech.net"
-  }],
-  "repositories": [{
-    "type": "git",
-    "url": "https://github.com/logikostech/common"
-  }],
-  "require": {
-    "php": ">=5.4",
-    "ext-phalcon": "2.*",
-    "logikostech/common": "dev-master"
-  },
-  "require-dev": {
-    "phpunit/phpunit": "4.0.*"
-  },
-  "autoload": {
-    "psr-4": {
-      "Logikos\\": "src/",
-      "Logikos\\Tests\\": "tests/"
+    "name": "logikostech/http",
+    "homepage": "https://github.com/logikostech/http",
+    "description": "Collection of calsses extending\\Phalcon\\Http\\* classes for added functionality",
+    "type": "library",
+    "license": "MIT",
+    "minimum-stability": "dev",
+    "keywords": [
+        "phalcon",
+        "plugin",
+        "logikostech",
+        "logikos",
+        "http"
+    ],
+    "authors": [{
+        "name": "Todd Empcke",
+        "email": "tempcke@logikostech.net"
+    }],
+    "repositories": [{
+        "type": "git",
+        "url": "https://github.com/logikostech/common"
+    }],
+    "require": {
+        "php": ">=5.4",
+        "ext-phalcon": "2.*",
+        "logikostech/common": "dev-master"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^4.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Logikos\\": "src/",
+            "Logikos\\Tests\\": "tests/"
+        }
     }
-  }
 }
