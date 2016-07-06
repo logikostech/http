@@ -137,8 +137,10 @@ class Response extends PhResponse {
     }
   }
   protected function disableView() {
-    if ($this->getDI()->get('view')) {
-      $this->getDI()->get('view')->disable();
+    if ($view=$this->getDI()->get('view')) {
+      if (method_exists($view,'disable')) {
+        $view->disable();
+      }
     }
   }
 }
