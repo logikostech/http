@@ -250,6 +250,10 @@ class Request extends \Phalcon\Http\Request {
       : false;
   }
   
+  public function isFromLocalhost() {
+    return $_SERVER['REMOTE_ADDR'] === $_SERVER['REMOTE_ADDR'];
+  }
+  
   protected function _getFileObject($file) {
     return new LogikosFile($file);
   }
