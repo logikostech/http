@@ -86,7 +86,12 @@ class RequestTest extends \PHPUnit_Framework_TestCase {
     $this->assertTrue($this->request->isMethod('PUT'));
     $this->assertTrue($this->request->isType('PUT'));
   }
-  
+  public function testPostMethodHackData() {
+    $this->setHackMethod('PUT');
+    $_POST['foo'] = 'bar';
+    $this->request = new Request();
+    $this->assertEquals('bar',$this->request->getPut('foo'));
+  }
   public function testCanGetContentTypeMime() {
     $this->_setServerVar("CONTENT_TYPE",'application/json; charset=utf-8');
     $this->assertEquals('application/json', $this->request->getContentTypeMime());

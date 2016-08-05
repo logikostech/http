@@ -105,8 +105,8 @@ class Request extends \Phalcon\Http\Request {
       $altmethod = $this->getPost('_method');
       if ($altmethod && $altmethod != 'POST') {
         if ($this->isValidHttpMethod($altmethod)) {
-          $this->setRawData($this->getPost());
           $_SERVER['REQUEST_METHOD'] = $altmethod;
+          $this->setRawData($this->getPost());
           return true;
         }
       }
